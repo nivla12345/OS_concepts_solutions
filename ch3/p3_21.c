@@ -35,6 +35,7 @@ int main(int argc, char* argv[])
                 n >>= 1;
             printf("%d\n", n);
         }
+        exit(0);
     }
     else { /* parent process */
         /* parent will wait for the child to complete */
