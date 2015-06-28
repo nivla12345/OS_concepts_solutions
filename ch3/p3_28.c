@@ -17,7 +17,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define BUFFER_SIZE 512
+#define BUFFER_SIZE 64
 #define READ_END    0
 #define WRITE_END   1
 
@@ -57,6 +57,8 @@ int main(int argc, char* argv[])
         size_t len = 0;
         ssize_t read;
 
+        close(fd[READ_END]);
+
         fp = fopen(argv[1], "r");
         if (fp == NULL)
             exit(-1);
@@ -81,17 +83,26 @@ int main(int argc, char* argv[])
         char* line;
         int str_len;
 
+        close(fd[WRITE_END]);
+
         fp = fopen(argv[2], "w");
         do {
             /* read from the pipe */
             read(fd[READ_END], line, BUFFER_SIZE);
-            str_len = strlen(line);
-            if (!str_len) {
-                printf("ERROR: Read line that consisted of 0 chars length.\n");
-                exit(-1);
+            str_len = 1;
+            if (line != NULL) {
+                str_len = strlen(line);
+                if (!str_len) {
+                    printf("ERROR: Read line that consisted of 0 chars length.\n");
+                    exit(-1);
+                }
+                fputs(line, fp);
             }
-            fputs(line, fp);
-        } while(line[str_len - 1] != EOF);
+            else {
+                printf("ERROR: Line is null.");
+                continue;
+            }
+        } while(line == NULL || line[str_len - 1] != EOF);
         fclose(fp);
 
         /* close the wrie end of the pipe */

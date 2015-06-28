@@ -14,13 +14,12 @@
 #include <string.h>
 
 #define BUFFER_SIZE 25
-#define READ_END	0
-#define WRITE_END	1
+#define READ_END    0
+#define WRITE_END   1
 
 int main(void)
 {
-	char write_msg[BUFFER_SIZE] = "Greetings";
-	char read_msg[BUFFER_SIZE];
+	char write_msg[BUFFER_SIZE];
 	pid_t pid;
 	int fd[2];
 
@@ -41,9 +40,9 @@ int main(void)
 	if (pid > 0) {  /* parent process */
 		/* close the unused end of the pipe */
 		close(fd[READ_END]);
-                sleep(3);
+                strcpy(write_msg, "parent process assigned");
 		/* write to the pipe */
-		write(fd[WRITE_END], write_msg, strlen(write_msg)+1); 
+		write(fd[WRITE_END], write_msg, strlen(write_msg)+1);
 
 		/* close the write end of the pipe */
 		close(fd[WRITE_END]);
@@ -53,8 +52,8 @@ int main(void)
 		close(fd[WRITE_END]);
 
 		/* read from the pipe */
-		read(fd[READ_END], read_msg, BUFFER_SIZE);
-		printf("child read %s\n",read_msg);
+		read(fd[READ_END], write_msg, BUFFER_SIZE);
+		printf("child read: %s\n", write_msg);
 
 		/* close the write end of the pipe */
 		close(fd[READ_END]);
