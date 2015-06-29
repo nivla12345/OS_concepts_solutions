@@ -13,15 +13,15 @@ int main()
     return 1;
   }
   else if (pid == 0) { /* child process */
-    sleep(100);
+    sleep(5);
     execlp("/bin/ls","ls", NULL);
   }
-//  else { /* parent process */
+  else { /* parent process */
     /* parent will wait for the child to complete */
 
-//    wait(NULL);
-//    printf("Child Complete\n");
-//  }
+    wait(NULL);
+    printf("Child Complete\n");
+  }
 
   return 0;
 }
