@@ -1,113 +1,58 @@
-/**
- * Example program demonstrating UNIX pipes.
- *
- * Figures 3.25 & 3.26
- *
- * @author Silberschatz, Galvin, and Gagne
- * Operating System Concepts  - Ninth Edition
- * Copyright John Wiley & Sons - 2013
- */
+#include<stdio.h>
+#include<sys/types.h>
+#include<sys/stat.h>
+#include<fcntl.h>
+#include<string.h>
+#include<stdlib.h>
 
-#define _GNU_SOURCE
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <string.h>
-#include <ctype.h>
+#define BUFFER_SIZE 50
 
-#define BUFFER_SIZE 64
-#define READ_END    0
-#define WRITE_END   1
+int main( int argc, char* argv[] ) {
+    int fdone[2];
+    pid_t childid;
 
-int main(int argc, char* argv[])
-{
-    pid_t pid;
-    int fd[2];
+    char readBuff[BUFFER_SIZE];
 
-    if (argc != 3) {
-        printf("ERROR: Incorrect number of parameters.\n");
-        return 0;
+    pipe(fdone);
+
+    if( argc != 3 ) {
+        printf("ERROR: Need exactly 2 parameters.\n");
+        exit(1);
     }
 
-    if (strlen(argv[1]) > BUFFER_SIZE) {
-        printf("ERROR: Incorrect number of parameters.\n");
-        return 0;
+    int fileOpen = open(argv[1], 0);
+    int targetFile = open(argv[2], O_RDWR|O_CREAT|O_APPEND, 0666);
+
+    if (fileOpen == -1 || targetFile == -1) {
+        printf("ERROR: Opening file failed\n");
+        exit(1);
     }
+    childid = fork();
 
-    /* create the pipe */
-    if (pipe(fd) == -1) {
-        fprintf(stderr,"Pipe failed");
-        return 1;
-    }
+    if (childid == 0) {
+        // inside the child prcocess
+        close(fdone[1]);
 
-    /* now fork a child process */
-    pid = fork();
-
-    if (pid < 0) {
-        fprintf(stderr, "Fork failed");
-        return 1;
-    }
-
-    if (pid > 0) {  /* parent process */
-        /* Open file to read data from */
-        FILE* fp;
-        char* line = NULL;
-        size_t len = 0;
-        ssize_t read;
-
-        close(fd[READ_END]);
-
-        fp = fopen(argv[1], "r");
-        if (fp == NULL)
-            exit(-1);
-
-        while ((read = getline(&line, &len, fp)) != -1) {
-            printf("Retrieved line of length %zu :\n", read);
-            printf("%s", line);
-
-            /* write to the pipe */
-            write(fd[WRITE_END], line, strlen(line) + 1);
+        while (read(fdone[0], readBuff, sizeof(readBuff)) > 0) {
+            // Writing to the target fileOpen
+            write(targetFile, readBuff, strlen(readBuff) - 1);
         }
 
-        fclose(fp);
-        if (line)
-            free(line);
-
-        close(fd[WRITE_END]);
-//        wait(NULL);
+        close(fdone[0]);
+        close(targetFile);
     }
-    else { /* child process */
-        FILE* fp;
-        char* line;
-        int str_len;
+    else {
+        // inside the parent process
+        close(fdone[0]);
 
-        close(fd[WRITE_END]);
+        // code to read from a text file
+        while (read(fileOpen, readBuff, sizeof(readBuff)) > 0) {
+            write(fdone[1], readBuff, sizeof(readBuff));
+            memset(readBuff, 0, BUFFER_SIZE);
+        }
 
-        fp = fopen(argv[2], "w");
-        do {
-            /* read from the pipe */
-            read(fd[READ_END], line, BUFFER_SIZE);
-            str_len = 1;
-            if (line != NULL) {
-                str_len = strlen(line);
-                if (!str_len) {
-                    printf("ERROR: Read line that consisted of 0 chars length.\n");
-                    exit(-1);
-                }
-                fputs(line, fp);
-            }
-            else {
-                printf("ERROR: Line is null.");
-                continue;
-            }
-        } while(line == NULL || line[str_len - 1] != EOF);
-        fclose(fp);
-
-        /* close the wrie end of the pipe */
-        close(fd[READ_END]);
+        close(fdone[1]);
+        close(fileOpen);
+        wait(NULL);
     }
-
-    return 0;
 }

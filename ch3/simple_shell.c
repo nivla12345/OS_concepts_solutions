@@ -67,6 +67,8 @@ int main(void)
             num_args = 0;
             // split command and args
             char* pch = strtok(cmd_input, " ");
+            int status;
+            pid_t returned_child;
             while (pch != NULL) {
                 args[num_args] = pch;
                 pch = strtok(NULL, " ");
@@ -87,10 +89,12 @@ int main(void)
             }
             else if (pid) { // Parent process
                 if (is_background) {
-                    waitpid(pid, NULL, WNOHANG);
+                    returned_child = waitpid(pid, NULL, WNOHANG);
+                    printf("wait_returned_child: %d, pid: %d\n", returned_child, pid);
                 }
                 else {
-                    wait(NULL);
+                    returned_child = wait(&status);
+                    printf("wait_returned_child: %d, pid: %d\n", returned_child, pid);
 //                    waitpid(pid, NULL, 0);
                 }
             }
