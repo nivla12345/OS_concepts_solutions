@@ -50,6 +50,7 @@ int increase_count(int count) {
 void* thread_task(void* param) {
     int random = (int)(5*(rand()/(double)RAND_MAX) + 1);
     increase_count(random);
+    decrease_count(random);
     pthread_exit(0);
 }
 
