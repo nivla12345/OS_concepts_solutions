@@ -24,6 +24,7 @@ void condition_wait();
 /* otherwise return -1 */
 int decrease_count(int count) {
     sem_wait(&lock);
+    printf("d curr:%d -%d\n", available_resources, count);
     if (available_resources < count) {
         condition_wait();
     }
@@ -38,6 +39,7 @@ int decrease_count(int count) {
 /* increase available_resources by count */
 int increase_count(int count) {
     sem_wait(&lock);
+    printf("i curr:%d +%d\n", available_resources, count);
     available_resources += count;
     condition_signal();
     if (next_count > 0)
@@ -49,8 +51,8 @@ int increase_count(int count) {
 
 void* thread_task(void* param) {
     int random = (int)(5*(rand()/(double)RAND_MAX) + 1);
-    increase_count(random);
     decrease_count(random);
+    increase_count(random);
     pthread_exit(0);
 }
 
