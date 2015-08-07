@@ -25,7 +25,7 @@ void condition_wait();
 int decrease_count(int count) {
     sem_wait(&lock);
     printf("d curr:%d -%d\n", available_resources, count);
-    if (available_resources < count) {
+    while (available_resources < count) {
         condition_wait();
     }
     available_resources -= count;
