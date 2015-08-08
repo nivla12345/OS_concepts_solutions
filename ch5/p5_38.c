@@ -36,6 +36,7 @@ int main(int argc, char* argv[])
     void* v_args;
 
 #if   OPTION == 1
+    // Only option 1 results in a segmentation fault.
     args_struct* args;
 #elif OPTION == 2
     args_struct* args = malloc(sizeof(args_struct));
