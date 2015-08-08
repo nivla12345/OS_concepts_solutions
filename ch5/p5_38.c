@@ -7,6 +7,8 @@
 #include <math.h>
 #include <time.h>
 
+#define OPTION 1
+
 typedef struct{
   int arr_len;
 } args_struct;
@@ -32,24 +34,33 @@ int main(int argc, char* argv[])
 {
     int i;
     void* v_args;
+
+#if   OPTION == 1
+    args_struct* args;
+#elif OPTION == 2
     args_struct* args = malloc(sizeof(args_struct));
+#else
+    args_struct args;
+#endif
+
     double pi = 0;
     int num_threads = 5;
     pthread_t thread[num_threads];
-
     srand(time(NULL));
-
     pthread_mutex_init(&mutex, NULL);
-
     if (argc != 2) {
         printf("ERROR: Needs exactly 1 argument.\n");
         exit(1);
     }
-
     int len = atoi(argv[1]);
-    (*args).arr_len = len;
 
+#if OPTION == 1 || OPTION == 2
+    (*args).arr_len = len;
     v_args = (void*)(args);
+#else
+    args.arr_len = len;
+    v_args = (void*)(&args);
+#endif
 
     for (i = 0; i < num_threads; i++) {
         if (pthread_create(&thread[i], NULL, &monte_carlo, v_args) != 0) {
@@ -62,7 +73,9 @@ int main(int argc, char* argv[])
         pthread_join(thread[i], NULL);
     pi = g_PI*4.0/(len * num_threads);
     printf("Pi is: %f\n", pi);
+#if OPTION == 2
     free(args);
+#endif
     return 0;
 }
 
