@@ -21,7 +21,6 @@ void* monte_carlo(void* v_as) {
         double random_y = rand()/(double)RAND_MAX;
         g_PI += random_x*random_x + random_y*random_y <= 1;
     }
-    //g_PI *= 4.0/arr_len;
     pthread_exit(0);
 }
 
