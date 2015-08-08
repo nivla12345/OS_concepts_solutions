@@ -24,10 +24,10 @@ void condition_wait();
 /* otherwise return -1 */
 int decrease_count(int count) {
     sem_wait(&lock);
-    printf("d curr:%d -%d\n", available_resources, count);
     while (available_resources < count) {
         condition_wait();
     }
+    printf("d curr:%d -%d\n", available_resources, count);
     available_resources -= count;
     if (next_count > 0)
         sem_post(&next);
