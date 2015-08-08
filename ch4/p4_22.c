@@ -27,7 +27,7 @@ void* monte_carlo(void* v_as) {
 int main(int argc, char* argv[])
 {
     int i;
-    args_struct* args;
+    args_struct* args = malloc(sizeof(args_struct));
     void* v_args;
     pthread_t thread;
     double pi = 0;
