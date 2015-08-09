@@ -39,3 +39,6 @@ thumbs.db
 
 # Debug files
 *.dSYM/
+
+# Other
+*.pdf

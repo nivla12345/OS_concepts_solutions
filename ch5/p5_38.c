@@ -1,65 +1,112 @@
 #include <sys/types.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <limits.h>
 #include <math.h>
 #include <time.h>
 
-typedef struct{
-  int arr_len;
-} args_struct;
+#define MAX_RESOURCES 5
 
-double g_PI = 0.0;
-static pthread_mutex_t mutex;
+void* thread_task(void* param);
 
-void* monte_carlo(void* v_as) {
-    args_struct* as = v_as;
-    int arr_len     = (*as).arr_len;
-    for (int i = 0; i < arr_len; i++) {
-        double random_x = rand()/(double)RAND_MAX;
-        double random_y = rand()/(double)RAND_MAX;
+static sem_t cvar, lock, next;
+int waiters;
+int next_count;
+static int available_resources = MAX_RESOURCES;
 
-        pthread_mutex_lock(&mutex);
-        g_PI += random_x*random_x + random_y*random_y <= 1;
-        pthread_mutex_unlock(&mutex);
+void condition_signal();
+void condition_wait();
+
+/* decrease available_resources by count resources */
+/* return 0 if sufficient resources available, */
+/* otherwise return -1 */
+int decrease_count(int count) {
+    sem_wait(&lock);
+    while (available_resources < count) {
+        condition_wait();
     }
+    printf("d curr:%d -%d\n", available_resources, count);
+    available_resources -= count;
+    if (next_count > 0)
+        sem_post(&next);
+    else
+        sem_post(&lock);
+    return 0;
+}
+
+/* increase available_resources by count */
+int increase_count(int count) {
+    sem_wait(&lock);
+    printf("i curr:%d +%d\n", available_resources, count);
+    available_resources += count;
+    condition_signal();
+    if (next_count > 0)
+        sem_post(&next);
+    else
+        sem_post(&lock);
+    return 0;
+}
+
+void* thread_task(void* param) {
+    int random = (int)(5*(rand()/(double)RAND_MAX) + 1);
+    decrease_count(random);
+    increase_count(random);
     pthread_exit(0);
 }
 
-int main(int argc, char* argv[])
+// Wait conditional variable call
+void condition_wait() {
+    waiters++;
+    if (next_count > 0)
+        sem_post(&next);
+    else
+        sem_post(&lock);
+    sem_wait(&cvar);
+    waiters--;
+}
+
+// Signal conditional variable call
+void condition_signal() {
+    if (waiters > 0) {
+        next_count++;
+        sem_post(&cvar);
+        sem_wait(&next);
+        next_count--;
+    }
+}
+
+int main()
 {
     int i;
-    void* v_args;
+    int num_threads = 10;
 
-    args_struct* args = malloc(sizeof(args_struct));
-    double pi = 0;
-    int num_threads = 5;
-    pthread_t thread[num_threads];
+    // Initialize all monitor semaphores + counters
+    sem_init(&cvar, 0, 0);
+    sem_init(&lock, 0, 1); // lock should be free initially
+    sem_init(&next, 0, 0);
+
+    next_count = 0;
+    waiters = 0;
+
+    // Generate random threads.
+    pthread_t threads[num_threads];
+
+    // Must seed time only once.
     srand(time(NULL));
-    pthread_mutex_init(&mutex, NULL);
-    if (argc != 2) {
-        printf("ERROR: Needs exactly 1 argument.\n");
-        exit(1);
-    }
-    int len = atoi(argv[1]);
-
-    (*args).arr_len = len;
-    v_args = (void*)(args);
 
     for (i = 0; i < num_threads; i++) {
-        if (pthread_create(&thread[i], NULL, &monte_carlo, v_args) != 0) {
-            printf("ERROR: Monte Carlo thread created incorrectly.\n");
+        if (pthread_create(&threads[i], NULL, thread_task, NULL) != 0) {
+            printf("ERROR: Pthread created incorrectly.\n");
             exit(0);
         }
     }
 
-    for (i = 0; i < num_threads; i++)
-        pthread_join(thread[i], NULL);
-    pi = g_PI*4.0/(len * num_threads);
-    printf("Pi is: %f\n", pi);
-    free(args);
+    for (i = 0; i < num_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
+    printf("last available_resources: %d\n", available_resources);
     return 0;
 }
 
