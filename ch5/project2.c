@@ -21,8 +21,13 @@
  *   - Philosophers represented as an array of threads.
  *   - Philosophers' mail boxes which are represented as a pair of boolean
  *     arrays each of size = NUM_PHILOSOPHERS
- *   - TODO An array of 5 condition variables, 1 for each thread that enables
+ *   - TODO
+ *     An additional potential optimization:
+ *     An array of 5 condition variables, 1 for each thread that enables
  *     the thread to sleep when waiting for the chopsticks.
+ *
+ *     This will also need an array of 5 mutexes mapped to each of the
+ *     conditional variables.
  */
 
 // Must be >= 3
@@ -174,8 +179,10 @@ void* philosopher_task(void* p_args) {
     while(1) {
         // 0) Check if can eat. Message other philosophers and wait if
         //    necessary.
-        // TODO After finishing, change this implementation to using
-        //      conditional variables.
+        // TODO
+        // Implement the conditional variables mentioned above. That would
+        // be a good exercise and would be able to replace the looping
+        // with a sleep.
         if (!has_right) {
             write_rmb(index);
             while (read_rmb(index)) {}
@@ -188,14 +195,13 @@ void* philosopher_task(void* p_args) {
             pthread_mutex_unlock(&chopstick_locks[index]);
             has_left = true;
         }
-        // TODO Mark chopsticks as dirty
         // 1) Eat
         sleep_random_123();
         dirty_forks(index);
         printf("p%d: ate\n", index);
 
-        // 2) Check mail box, checks fork and clean and distribute if there's
-        //    mail and if fork is dirty otherwise do nothing.
+        // 2) Check mail box, checks fork, if there's mail, clean fork and release,
+        //    otherwise do nothing.
         if (read_my_rmb(index)) {
             clean_right_fork(index);
             pthread_mutex_unlock(&chopstick_locks[r_chopstick_index]);
