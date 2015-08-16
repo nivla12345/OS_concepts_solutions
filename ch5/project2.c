@@ -45,8 +45,6 @@ static pthread_cond_t  barrier_cond;
 static int             barrier_countdown = NUM_PHILOSOPHERS;
 // Chopstick variables
 // For reference, the index is assumed to be the left chopstick.
-// Hence:
-//  (i + 1) % NUM_PHILOSOPHERS = right chopstick
 static pthread_mutex_t chopstick_locks[NUM_PHILOSOPHERS];
 static bool            chopstick_clean[NUM_PHILOSOPHERS];
 // Mailbox variables
@@ -83,6 +81,50 @@ bool read_mail_box(bool left, int index) {
     return value;
 }
 
+// *mb = right/left mail box
+// These are the only handles necessary to manage mail boxes.
+bool read_my_lmb(int index) {
+    return read_mail_box(true, index);
+}
+bool read_my_rmb(int index) {
+    return read_mail_box(false, index);
+}
+bool read_lmb(int index) {
+    int left_index  = (index + 1) % NUM_PHILOSOPHERS;
+    return read_mail_box(false, left_index);
+}
+bool read_rmb(int index) {
+    int right_index = (index + LAST_INDEX) % NUM_PHILOSOPHERS;
+    return read_mail_box(true, right_index);
+}
+void clear_my_lmb(int index) {
+    write_mail_box(true, index, false);
+}
+void clear_my_rmb(int index) {
+    write_mail_box(false, index, false);
+}
+void write_lmb(int index) {
+    int left_index  = (index + 1) % NUM_PHILOSOPHERS;
+    write_mail_box(false, left_index, true);
+}
+void write_rmb(int index) {
+    int right_index = (index + LAST_INDEX) % NUM_PHILOSOPHERS;
+    write_mail_box(true, right_index, true);
+}
+
+// Fork handlers
+// Marks both forks dirty
+void dirty_forks(int index) {
+    chopstick_clean[index] = false;
+    chopstick_clean[(index + 1) % NUM_PHILOSOPHERS];
+}
+void clean_left_fork(int index) {
+    chopstick_clean[index] = true;
+}
+void clean_right_fork(int index) {
+    chopstick_clean[(index + 1) % NUM_PHILOSOPHERS] = true;
+}
+
 // Threads wait here until all threads have reached this point.
 int barrier_point() {
     pthread_mutex_lock(&barrier_lock);
@@ -97,53 +139,77 @@ int barrier_point() {
     return 0;
 }
 
-void* philosopher_task(void* p_args) {
-    int index = *((int*)p_args);
-    bool has_left  = false;
-    bool has_right = false;
-
-    // Get assigned a chopstick
-    // Philosopher 0 gets 2 chopsticks
-    if (index == 0) {
-        pthread_mutex_unlock(&chopstick_locks[index]);
-        has_left  = true;
-        pthread_mutex_unlock(&chopstick_locks[LAST_INDEX];
-        has_right = true;
-    }
-    // Philosophers [1:3] get 1 chopstick
-    else if (index < LAST_INDEX) {
-        pthread_mutex_unlock(&chopstick_locks[index]);
-        has_left = true;
-    }
-    barrier_point();
-
-    // Loop: think, eat, or wait.
-    while(1) {
-        // 0) Check if can eat. Message other philosiphers and wait if can't.
-        if (!has_left)
-            write_mail_box(true, index, true);
-        if (!has_right)
-            write_mail_box(false, index, true);
-        
-        // TODO While message boxes haven't been cleared, wait
-        // TODO After finishing, change this implementation to using
-        //      conditional variables.
-        // TODO Mark chopsticks as dirty
-        // 1) Obtain chopstick lock and think
-        sleep_random_123();
-        // 2) Check mail box, checks fork and clean and distribute if there's
-        //    mail and if fork is dirty otherwise do nothing.
-
-    }
-    pthread_exit(0);
-}
-
+// Sleep from [1:3] seconds
 void sleep_random_123() {
     double raw_rand_sleep;
     int rand_sleep;
     raw_rand_sleep = rand()/(double)RAND_MAX;
     rand_sleep = 1 + ((int)(raw_rand_sleep * 3));
     sleep(rand_sleep);
+}
+
+void* philosopher_task(void* p_args) {
+    int index = *((int*)p_args);
+    int r_chopstick_index = (index + 1) % NUM_PHILOSOPHERS;
+    bool has_left  = false;
+    bool has_right = false;
+
+    // Get assigned a chopstick
+    //   Philosopher 0 gets 2 chopsticks
+    if (index == 0) {
+        pthread_mutex_unlock(&chopstick_locks[index]);
+        has_left  = true;
+        pthread_mutex_unlock(&chopstick_locks[LAST_INDEX]);
+        has_right = true;
+    }
+    //   Philosophers [1:3] get 1 chopstick
+    else if (index < LAST_INDEX) {
+        pthread_mutex_unlock(&chopstick_locks[index]);
+        has_left = true;
+    }
+    // Wait for every thread to get assigned a chopstick
+    barrier_point();
+
+    // Loop: think, eat, or wait.
+    while(1) {
+        // 0) Check if can eat. Message other philosophers and wait if
+        //    necessary.
+        // TODO After finishing, change this implementation to using
+        //      conditional variables.
+        if (!has_right) {
+            write_rmb(index);
+            while (read_rmb(index)) {}
+            pthread_mutex_unlock(&chopstick_locks[r_chopstick_index]);
+            has_right = true;
+        }
+        if (!has_left) {
+            write_lmb(index);
+            while (read_lmb(index)) {}
+            pthread_mutex_unlock(&chopstick_locks[index]);
+            has_left = true;
+        }
+        // TODO Mark chopsticks as dirty
+        // 1) Eat
+        sleep_random_123();
+        dirty_forks(index);
+        printf("p%d: ate\n", index);
+
+        // 2) Check mail box, checks fork and clean and distribute if there's
+        //    mail and if fork is dirty otherwise do nothing.
+        if (read_my_rmb(index)) {
+            clean_right_fork(index);
+            pthread_mutex_unlock(&chopstick_locks[r_chopstick_index]);
+            clear_my_rmb(index);
+            has_right = false;
+        }
+        if (read_my_lmb(index)) {
+            clean_left_fork(index);
+            pthread_mutex_unlock(&chopstick_locks[index]);
+            clear_my_lmb(index);
+            has_left = false;
+        }
+    }
+    pthread_exit(0);
 }
 
 int main() {
