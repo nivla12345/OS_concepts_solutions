@@ -12,6 +12,8 @@
  *
  * Implementation Overview:
  *   Locks + Shared Objects -
+ *   - Barrier s.t. the initialization of handing out forks ensures an acyclic
+ *     graph.
  *   - 
  */
 
@@ -25,28 +27,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <errno.h>
 
 static pthread_mutex_t barrier_lock;
-static pthread_cond_var barrier_cond;
+static pthread_cond_t barrier_cond;
 static int barrier_countdown = NUM_PHILOSOPHERS;
 
-/* decrease barrier_countdown by count resources */
-/* return 0 if sufficient resources available, */
-/* otherwise return -1 */
+// Threads wait here until all threads have reached this point.
 int barrier_point() {
     pthread_mutex_lock(&barrier_lock);
     barrier_countdown--;
-    printf("%d\n", pthread_self());
-    if (barrier_countdown) {
-        pthread_cond_wait(&barrier_lock, &barrier_cond);
-    }
-    printf("%d\n", pthread_self());
+    if (barrier_countdown)
+        pthread_cond_wait(&barrier_cond, &barrier_lock);
     pthread_cond_signal(&barrier_cond);
     pthread_mutex_unlock(&barrier_lock);
     return 0;
 }
 
-void* thread_task(void* param) {
+void* philosopher_task() {
     sleep(1);
     barrier_point();
     pthread_exit(0);
@@ -57,20 +55,16 @@ int main()
     int i;
     pthread_t threads[NUM_PHILOSOPHERS];
 
+    // Set up barrier lock + condition var.
     pthread_mutex_init(&barrier_lock, NULL);
-    pthread_cond_init(&barrier_cond);
+    pthread_cond_init(&barrier_cond, NULL);
 
     for (i = 0; i < NUM_PHILOSOPHERS; i++) {
-        if (pthread_create(&threads[i], NULL, thread_task, NULL) != 0) {
+        if (pthread_create(&threads[i], NULL, philosopher_task, NULL) != 0) {
             printf("ERROR: Pthread created incorrectly.\n");
             exit(0);
         }
     }
-
-    for (i = 0; i < NUM_PHILOSOPHERS; i++) {
-        pthread_join(threads[i], NULL);
-    }
-    printf("last barrier_countdown: %d\n", barrier_countdown);
     return 0;
 }
 

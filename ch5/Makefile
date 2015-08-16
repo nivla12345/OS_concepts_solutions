@@ -1,14 +1,5 @@
-CC=gcc
-CFLAGS= -pthread -std=c99 -Werror
-
-OBJS = a.o
-
-all: p2
-
-p2: $(OBJS)
-	$(CC) $(CFLAGS) -o p2 $(OBJS)
-
-a.o: project2.c
+p2: project2.c
+	gcc -o p2.o project2.c -pthread -std=c99 -g
 
 clean:
-	rm -f *~ *.o p2
+	rm -rf ~.o
