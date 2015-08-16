@@ -11,8 +11,8 @@
 void* thread_task(void* param);
 
 static sem_t cvar, lock, next;
-int waiters;
-int next_count;
+static int waiters;
+static int next_count;
 static int num_threads;
 
 // Wait conditional variable call
@@ -36,9 +36,7 @@ void condition_signal() {
     }
 }
 
-/* decrease num_threads by count resources */
-/* return 0 if sufficient resources available, */
-/* otherwise return -1 */
+// Threads stop here until all threads reach this point.
 int barrier_point() {
     sem_wait(&lock);
     num_threads--;
@@ -74,7 +72,6 @@ int main()
     next_count = 0;
     waiters = 0;
 
-    // Generate random threads.
     pthread_t threads[num_threads];
 
     for (i = 0; i < num_threads; i++) {
