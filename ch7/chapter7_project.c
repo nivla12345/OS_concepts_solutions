@@ -23,10 +23,6 @@ requests get denied.
 #define NUMBER_OF_CUSTOMERS 5
 #define NUMBER_OF_RESOURCES 3
 
-typedef struct{
-  int customer_id;
-} args_struct;
-
 /* the available amount of each resource */
 // This definitely requires a mutex.
 int g_available[NUMBER_OF_RESOURCES];
@@ -54,12 +50,12 @@ int release_resources(int customer_num, int request[]) {
 }
 
 void* customer_thread(void* c_void_args) {
-    args_struct* as = c_void_args;
-    int customer_id = (*as).customer_id;
+    int* as = c_void_args;
+    int customer_id = *as;
 
-/*    while (true) {
+//    while (1) {
         
-    }*/
+//    }
     printf("thread id: %d\n", customer_id);
     pthread_exit(0);
 }
@@ -67,9 +63,9 @@ void* customer_thread(void* c_void_args) {
 int main(int nargs, char* argv[]) {
     int i, j;
     // The arguments, in this case simply the customer ID.
-    args_struct*   args[NUMBER_OF_CUSTOMERS];
-    void*        v_args[NUMBER_OF_CUSTOMERS];
-    pthread_t    thread[NUMBER_OF_CUSTOMERS];
+    int       args  [NUMBER_OF_CUSTOMERS];
+    void*     v_args[NUMBER_OF_CUSTOMERS];
+    pthread_t thread[NUMBER_OF_CUSTOMERS];
 
     if (nargs != NUMBER_OF_RESOURCES + 1) {
         printf("ERROR: Needs exactly %d arguments.\n", NUMBER_OF_RESOURCES);
@@ -100,12 +96,13 @@ int main(int nargs, char* argv[]) {
 
     // Construct and spawn arguments and threads
     for (i = 0; i < NUMBER_OF_CUSTOMERS; i++) {
-        (*args[i]).customer_id = i;
-        v_args[i] = (void*)args[i];
+        args[i] = i;
+        v_args[i] = (void*)(args + i);
         if (pthread_create(&thread[i], NULL, &customer_thread, v_args[i]) != 0) {
             printf("ERROR: Monte Carlo thread created incorrectly.\n");
             exit(0);
         }
+        printf("End of loop iteration.\n");
     }
 
 
