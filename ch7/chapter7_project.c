@@ -14,6 +14,7 @@ requests get denied.
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <limits.h>
 #include <math.h>
@@ -22,6 +23,8 @@ requests get denied.
 /* these may be any values >= 0 */
 #define NUMBER_OF_CUSTOMERS 5
 #define NUMBER_OF_RESOURCES 3
+
+static pthread_mutex_t resource_lock;
 
 /* the available amount of each resource */
 // This definitely requires a mutex.
@@ -32,31 +35,92 @@ int g_available[NUMBER_OF_RESOURCES];
 int g_maximum[NUMBER_OF_CUSTOMERS][NUMBER_OF_RESOURCES];
 
 /* the amount currently allocated to each customer */
-// This variable needs to be grouped with the g_available mutex
 int g_allocation[NUMBER_OF_CUSTOMERS][NUMBER_OF_RESOURCES];
 
 /* the remaining need of each customer */
-// This variable needs to be grouped with the g_available mutex
 int g_need[NUMBER_OF_CUSTOMERS][NUMBER_OF_RESOURCES];
 
-// Requests resources contained in request[] for customer_num
+// Requests resources contained in request[] for customer_num, positive successful.
+// Performs a banker's safety algorithm.
 int request_resources(int customer_num, int request[]) {
+
     return 0;
 }
 
 // Requests resources contained in request[] for customer_num
-int release_resources(int customer_num, int request[]) {
+int release_resources(int customer_num, int release[]) {
+    pthread_mutex_lock(&resource_lock);
+    for (int i = 0; i < NUMBER_OF_RESOURCES; i++) {
+        g_available[i] += release[i];
+    }
+    pthread_mutex_unlock(&resource_lock);
+    for (int i = 0; i < NUMBER_OF_RESOURCES; i++) {
+        g_allocation[customer_num][i] -= release[i];
+        g_need      [customer_num][i] += release[i];
+    }
     return 0;
+}
+
+// Return 0 if not equal, not 0 if equal
+bool cmpArr(int a[], int b[]) {
+    if ((a == NULL) ^ (b == NULL))
+        return false;
+    int arrLenA = sizeof(a)/sizeof(a[0]);
+    int arrLenB = sizeof(b)/sizeof(b[0]);
+    if (arrLenB != arrLenA)
+        return false;
+    for (int i = 0; i < arrLenA; i++) {
+        if (a[i] != b[i])
+            return false;
+    }
+    return true;
+}
+
+void printArr(int a[]) {
+    if (a == NULL)
+        return;
+    int lenA = sizeof(a)/sizeof(a[0]);
+    for (int i = 0; i < lenA; i++) {
+        printf("%d ", a[i]);
+    }
+    printf("\n");
 }
 
 void* customer_thread(void* c_void_args) {
     int* as = c_void_args;
     int customer_id = *as;
-
-//    while (1) {
-        
-//    }
+    int request[NUMBER_OF_RESOURCES];
     printf("thread id: %d\n", customer_id);
+    while (true) {
+        // Generate request random number of resources.
+        for (int i = 0; i < NUMBER_OF_RESOURCES; i++) {
+            request[i] = rand() % (g_need[customer_id][i] + 1);
+        }
+
+        // Request a random number of resources. Grant if safe.
+        if (request_resources(customer_id, request)) {
+            pthread_mutex_lock(&resource_lock);
+            for (int i = 0; i < NUMBER_OF_RESOURCES; i++) {
+                g_available[i] -= request[i];
+            }
+            pthread_mutex_unlock(&resource_lock);
+            for (int i = 0; i < NUMBER_OF_RESOURCES; i++) {
+                g_allocation[customer_id][i] += request[i];
+                g_need      [customer_id][i] -= request[i];
+            }
+        }
+
+        sleep(rand() % 2);
+
+        // Generate release random number of resources.
+        for (int i = 0; i < NUMBER_OF_RESOURCES; i++) {
+            request[i] = rand() % (g_allocation[customer_id][i] + 1);
+        }
+
+        // Release a random number of resources.
+        if (release_resources(customer_id, request)) {
+        }
+    }
     pthread_exit(0);
 }
 
@@ -66,6 +130,8 @@ int main(int nargs, char* argv[]) {
     int       args  [NUMBER_OF_CUSTOMERS];
     void*     v_args[NUMBER_OF_CUSTOMERS];
     pthread_t thread[NUMBER_OF_CUSTOMERS];
+
+    pthread_mutex_init(&resource_lock, NULL);
 
     if (nargs != NUMBER_OF_RESOURCES + 1) {
         printf("ERROR: Needs exactly %d arguments.\n", NUMBER_OF_RESOURCES);
